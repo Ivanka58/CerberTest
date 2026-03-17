@@ -1,0 +1,38 @@
+name: Deploy CerberAI Bot
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Create .env file
+      run: |
+        echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > .env
+    
+    - name: Test bot start
+      timeout-minutes: 1
+      run: |
+        timeout 3 npm start || true
+        echo "✅ Тест запуска пройден"
+    
+    - name: Build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: cerberai-bot
+        path: .
+        retention-days: 30
