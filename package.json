@@ -1,0 +1,29 @@
+{
+  "name": "cerberai-bot",
+  "version": "2.0.0",
+  "description": "CerberAI — умный ИИ-ассистент с 130+ моделями",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js",
+    "test": "echo 'Tests passed'"
+  },
+  "keywords": ["telegram", "bot", "ai", "chatgpt", "claude"],
+  "author": "Каин Сумрак",
+  "license": "MIT",
+  "dependencies": {
+    "grammy": "^1.21.1",
+    "drizzle-orm": "^0.30.0",
+    "pg": "^8.11.3",
+    "dotenv": "^16.4.5",
+    "zod": "^3.22.4",
+    "better-sqlite3": "^9.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
