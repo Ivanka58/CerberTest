@@ -7,7 +7,7 @@ import { handleBalance, handleBuyTokens, handleBuyPack, handleSetLimit } from '.
 import { handleProfile } from './commands/profile.js';
 import { handleRules } from './commands/rules.js';
 import { handleHelp } from './commands/help.js';
-import { handleStats, handleAdminAction, processAdminInput, isAdmin } from './commands/admin.js';
+import { handleStats, handleVip, handleAdminAction, processAdminInput, isAdmin } from './commands/admin.js';
 import { handleUserMessage } from './handlers/message.js';
 import { handlePreCheckout, handleSuccessfulPayment } from './handlers/payment.js';
 
@@ -37,6 +37,7 @@ bot.command("profile", handleProfile);
 bot.command("rules", handleRules);
 bot.command("help", handleHelp);
 bot.command("stats", handleStats);
+bot.command("vip", handleVip);
 
 bot.callbackQuery("start", async (ctx) => { 
   await handleStart(ctx); 
@@ -94,22 +95,11 @@ bot.callbackQuery(/^models_(\d+)$/, async (ctx) => {
   await handleModelsCategory(ctx, idx);
 });
 
-bot.callbackQuery(/^admin_(.+)$/, async (ctx) => {
+bot.callbackQuery(/^admin:(.+)$/, async (ctx) => {
   const action = ctx.match[1];
   
-  if (action === "confirm_broadcast") {
-    const state = adminState.get(ctx.from.id);
-    if (state?.pendingBroadcast) {
-      await ctx.reply(`📢 Рассылка отправлена: ${state.pendingBroadcast}`);
-      adminState.delete(ctx.from.id);
-    }
-    await ctx.answerCallbackQuery();
-    return;
-  }
-
-  if (action === "cancel_broadcast") {
-    adminState.delete(ctx.from.id);
-    await ctx.reply("❌ Рассылка отменена");
+  if (action === "stats") {
+    await handleStats(ctx);
     await ctx.answerCallbackQuery();
     return;
   }
@@ -136,8 +126,8 @@ bot.on("message:text", async (ctx) => {
       if (state.action === "broadcast") {
         adminState.set(userId, { ...state, pendingBroadcast: text });
         const keyboard = new InlineKeyboard()
-          .text("✅ Подтвердить", "admin_confirm_broadcast")
-          .text("❌ Отмена", "admin_cancel_broadcast");
+          .text("✅ Подтвердить", "admin:confirm_broadcast")
+          .text("❌ Отмена", "admin:cancel_broadcast");
         await ctx.reply(
           `📢 Предпросмотр рассылки:\n\n${text}\n\nПодтвердить отправку?`,
           { reply_markup: keyboard }
