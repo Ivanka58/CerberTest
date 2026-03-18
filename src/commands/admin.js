@@ -26,6 +26,34 @@ export async function handleStats(ctx) {
   );
 }
 
+export async function handleVip(ctx) {
+  if (!isAdmin(ctx.from.id)) {
+    await ctx.reply("⛔ Нет доступа");
+    return;
+  }
+  
+  const adminName = ctx.from.first_name || "Админ";
+  
+  const keyboard = new InlineKeyboard()
+    .text("👑 Дать VIP", "admin:give_vip")
+    .text("❌ Забрать VIP", "admin:take_vip")
+    .row()
+    .text("🚫 Забанить", "admin:ban")
+    .text("✅ Разбанить", "admin:unban")
+    .row()
+    .text("📢 Рассылка", "admin:broadcast")
+    .text("📊 Статистика", "admin:stats");
+  
+  await ctx.reply(
+    `👋 Добро пожаловать в админ меню, *${adminName}*!\n\n` +
+    `Выберите кнопку ниже:`,
+    { 
+      parse_mode: "Markdown",
+      reply_markup: keyboard
+    }
+  );
+}
+
 export async function handleAdminAction(ctx, action) {
   const actionNames = {
     give_vip: "дать VIP",
