@@ -4,6 +4,9 @@ import Database from 'better-sqlite3';
 const sqlite = new Database('cerberai.db');
 export const db = drizzle(sqlite);
 
+// Экспортируем sqlite для прямых SQL-запросов в queries.js
+export { sqlite };
+
 // Создаём таблицы если их нет
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS users (
