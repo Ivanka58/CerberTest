@@ -8,6 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 часов максимум
     
     steps:
     - uses: actions/checkout@v4
@@ -24,15 +25,5 @@ jobs:
       run: |
         echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > .env
     
-    - name: Test bot start
-      timeout-minutes: 1
-      run: |
-        timeout 3 npm start || true
-        echo "✅ Тест запуска пройден"
-    
-    - name: Build artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: cerberai-bot
-        path: .
-        retention-days: 30
+    - name: Start bot
+      run: npm start
