@@ -43,7 +43,7 @@ export async function handleUserMessage(ctx) {
     return;
   }
 
-  const typingMsg = await ctx.reply("🧠 _Анализирую запрос и выбираю лучшую модель...", { parse_mode: "Markdown" });
+  const typingMsg = await ctx.reply("🧠 _Анализирую запрос и выбираю лучшую модель_...", { parse_mode: "Markdown" });
 
   try {
     const route = await routeRequest(userMessage);
