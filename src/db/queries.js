@@ -59,6 +59,11 @@ export async function setBan(telegramId, isBanned) {
   return true;
 }
 
+export async function setTokenLimit(telegramId, limit) {
+  db.prepare('UPDATE users SET token_limit = ? WHERE telegram_id = ?').run(limit, telegramId);
+  return true;
+}
+
 export async function getChatHistory(telegramId, limit = 100) {
   const rows = db.prepare(`
     SELECT * FROM chat_history 
@@ -106,4 +111,4 @@ export async function getStats() {
 
 export async function getAllUsers() {
   return db.prepare('SELECT * FROM users').all();
-    }
+}
