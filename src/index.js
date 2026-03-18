@@ -98,6 +98,26 @@ bot.callbackQuery(/^models_(\d+)$/, async (ctx) => {
 bot.callbackQuery(/^admin:(.+)$/, async (ctx) => {
   const action = ctx.match[1];
   
+  // Обрабатываем confirm_broadcast и cancel_broadcast отдельно
+  if (action === "confirm_broadcast") {
+    const state = adminState.get(ctx.from.id);
+    if (state?.pendingBroadcast) {
+      await ctx.reply(`📢 Рассылка отправлена: ${state.pendingBroadcast}`);
+      adminState.delete(ctx.from.id);
+    } else {
+      await ctx.reply("❌ Нет сообщения для рассылки");
+    }
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  if (action === "cancel_broadcast") {
+    adminState.delete(ctx.from.id);
+    await ctx.reply("❌ Рассылка отменена");
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
   if (action === "stats") {
     await handleStats(ctx);
     await ctx.answerCallbackQuery();
