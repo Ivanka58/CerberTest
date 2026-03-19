@@ -13,6 +13,11 @@ import { handlePreCheckout, handleSuccessfulPayment } from './handlers/payment.j
 
 dotenv.config();
 
+if (!apiKey) {
+  console.error('❌ OPENROUTER_API_KEY не найден в переменных окружения');
+  process.exit(1);
+}
+
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("❌ TELEGRAM_BOT_TOKEN не найден в .env");
   process.exit(1);
