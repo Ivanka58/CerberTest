@@ -98,7 +98,6 @@ bot.callbackQuery(/^models_(\d+)$/, async (ctx) => {
 bot.callbackQuery(/^admin:(.+)$/, async (ctx) => {
   const action = ctx.match[1];
   
-  // Обрабатываем confirm_broadcast и cancel_broadcast отдельно
   if (action === "confirm_broadcast") {
     const state = adminState.get(ctx.from.id);
     if (state?.pendingBroadcast) {
@@ -165,7 +164,7 @@ bot.on("message:text", async (ctx) => {
         return;
       }
 
-      const result = await processAdminInput(ctx, text, state.action);
+      const result = await processAdminInput(ctx, text, state.action, bot);
       if (result !== "awaiting_broadcast_confirm") {
         adminState.delete(userId);
       }
