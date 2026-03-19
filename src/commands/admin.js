@@ -99,3 +99,30 @@ export async function processAdminInput(ctx, text, action) {
   
   return "success";
 }
+
+// Функция для рассылки всем пользователям
+export async function sendBroadcast(bot, messageText) {
+  const users = await getAllUsers();
+  let sentCount = 0;
+  let failedCount = 0;
+  
+  for (const user of users) {
+    try {
+      // Пропускаем забаненных
+      if (user.is_banned) continue;
+      
+      await bot.api.sendMessage(user.telegram_id, messageText);
+      sentCount++;
+      
+      // Задержка чтобы не превысить лимиты Telegram (30 сообщений/сек)
+      if (sentCount % 30 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (error) {
+      failedCount++;
+      console.error(`❌ Не удалось отправить пользователю ${user.telegram_id}:`, error.message);
+    }
+  }
+  
+  return { sentCount, failedCount, total: users.length };
+}
