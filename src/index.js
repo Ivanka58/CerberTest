@@ -7,7 +7,7 @@ import { handleBalance, handleBuyTokens, handleBuyPack, handleSetLimit } from '.
 import { handleProfile } from './commands/profile.js';
 import { handleRules } from './commands/rules.js';
 import { handleHelp } from './commands/help.js';
-import { handleStats, handleVip, handleAdminAction, processAdminInput, isAdmin } from './commands/admin.js';
+import { handleStats, handleVip, handleAdminAction, processAdminInput, isAdmin, sendBroadcast } from './commands/admin.js';
 import { handleUserMessage } from './handlers/message.js';
 import { handlePreCheckout, handleSuccessfulPayment } from './handlers/payment.js';
 
@@ -102,7 +102,17 @@ bot.callbackQuery(/^admin:(.+)$/, async (ctx) => {
   if (action === "confirm_broadcast") {
     const state = adminState.get(ctx.from.id);
     if (state?.pendingBroadcast) {
-      await ctx.reply(`📢 Рассылка отправлена: ${state.pendingBroadcast}`);
+      await ctx.reply("⏳ Начинаю рассылку...");
+      
+      const result = await sendBroadcast(bot, state.pendingBroadcast);
+      
+      await ctx.reply(
+        `✅ Рассылка завершена!\n\n` +
+        `📨 Отправлено: ${result.sentCount}\n` +
+        `❌ Не удалось: ${result.failedCount}\n` +
+        `👥 Всего пользователей: ${result.total}`
+      );
+      
       adminState.delete(ctx.from.id);
     } else {
       await ctx.reply("❌ Нет сообщения для рассылки");
