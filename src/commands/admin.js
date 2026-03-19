@@ -70,7 +70,7 @@ export async function handleAdminAction(ctx, action) {
   );
 }
 
-export async function processAdminInput(ctx, text, action) {
+export async function processAdminInput(ctx, text, action, bot) {
   if (!isAdmin(ctx.from.id)) return "no_access";
   
   if (action === "broadcast") {
@@ -86,15 +86,58 @@ export async function processAdminInput(ctx, text, action) {
   if (action === "give_vip") {
     await setVip(targetId, true);
     await ctx.reply(`✅ VIP выдан пользователю ${targetId}`);
+    
+    // Уведомление пользователю
+    try {
+      await bot.api.sendMessage(targetId, 
+        "👑 Администратор выдал вам VIP доступ!\n\n" +
+        "Пользуйтесь ботом без ограничений!"
+      );
+    } catch (error) {
+      console.error(`❌ Не удалось уведомить пользователя ${targetId}:`, error.message);
+    }
+    
   } else if (action === "take_vip") {
     await setVip(targetId, false);
     await ctx.reply(`✅ VIP забран у пользователя ${targetId}`);
+    
+    // Уведомление пользователю
+    try {
+      await bot.api.sendMessage(targetId, 
+        "❌ Администратор забрал у вас VIP доступ(\n\n" +
+        "Видимо вы где-то наложали..."
+      );
+    } catch (error) {
+      console.error(`❌ Не удалось уведомить пользователя ${targetId}:`, error.message);
+    }
+    
   } else if (action === "ban") {
     await setBan(targetId, true);
     await ctx.reply(`🚫 Пользователь ${targetId} забанен`);
+    
+    // Уведомление пользователю
+    try {
+      await bot.api.sendMessage(targetId, 
+        "🚫 Администратор забанил вас, значит вы нарушали правила бота.\n\n" +
+        "Напишите создателю @Ivanka58 и расскайтесь, может он вас простит."
+      );
+    } catch (error) {
+      console.error(`❌ Не удалось уведомить пользователя ${targetId}:`, error.message);
+    }
+    
   } else if (action === "unban") {
     await setBan(targetId, false);
     await ctx.reply(`✅ Пользователь ${targetId} разбанен`);
+    
+    // Уведомление пользователю
+    try {
+      await bot.api.sendMessage(targetId, 
+        "✅ Администратор снял у вас бан, поздравляю!\n\n" +
+        "Пользуйтесь ботом и не нарушайте правила!"
+      );
+    } catch (error) {
+      console.error(`❌ Не удалось уведомить пользователя ${targetId}:`, error.message);
+    }
   }
   
   return "success";
