@@ -23,6 +23,8 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
   process.exit(1);
 }
 
+const apiKey = process.env.OPENROUTER_API_KEY;
+
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 const adminState = new Map();
 
