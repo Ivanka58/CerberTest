@@ -1,13 +1,26 @@
 import OpenAI from 'openai';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+// Явно используем OPENROUTER_API_KEY
+const apiKey = process.env.OPENROUTER_API_KEY;
+
+if (!apiKey) {
+  console.error('❌ OPENROUTER_API_KEY не найден в переменных окружения');
+  process.exit(1);
+}
 
 const openrouter = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY,
+  apiKey: apiKey, // Явно передаём ключ
   defaultHeaders: {
     'HTTP-Referer': 'https://github.com/Ivanka58/CerberTest',
     'X-Title': 'CerberAI Bot'
   }
 });
+
+// ... остальной код без изменений ...
 
 // Маппинг ID моделей для OpenRouter
 export const MODELS = {
