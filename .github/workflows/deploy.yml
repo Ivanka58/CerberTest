@@ -24,7 +24,6 @@ jobs:
     - name: Create .env file
       run: |
         echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > .env
-        echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" >> .env
         
     - name: Start bot
       run: npm start
