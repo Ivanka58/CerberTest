@@ -13,6 +13,8 @@ import { handlePreCheckout, handleSuccessfulPayment } from './handlers/payment.j
 
 dotenv.config();
 
+const apiKey = process.env.OPENROUTER_API_KEY;
+
 if (!apiKey) {
   console.error('❌ OPENROUTER_API_KEY не найден в переменных окружения');
   process.exit(1);
@@ -22,8 +24,6 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("❌ TELEGRAM_BOT_TOKEN не найден в .env");
   process.exit(1);
 }
-
-const apiKey = process.env.OPENROUTER_API_KEY;
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 const adminState = new Map();
