@@ -12,49 +12,71 @@ export const POLLINATIONS_MODELS = {
   'deepseek': 'deepseek'   // DeepSeek Chat
 };
 
-// Основная функция для текстовой генерации
+// Основная функция для текстовой генерации (ИСПРАВЛЕНО: POST вместо GET)
 export async function askPollinations(messages, model = 'openai') {
   try {
-    // Формируем промпт из сообщений
-    const prompt = messages.map(m => {
-      if (m.role === 'system') return `Инструкция: ${m.content}`;
-      if (m.role === 'user') return `Вопрос: ${m.content}`;
-      if (m.role === 'assistant') return `Ответ: ${m.content}`;
-      return m.content;
-    }).join('\n\n');
-    
-    // Добавляем случайный seed для уникальности
-    const seed = Date.now();
-    const url = `${BASE_URL}/${encodeURIComponent(prompt)}?model=${model}&seed=${seed}&json=false`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'text/plain, */*',
-        'User-Agent': 'CerberAI-Bot/2.0'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // ИСПРАВЛЕНИЕ: Преобразуем сообщения в формат OpenAI-compatible
+    const cleanMessages = messages.map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 
+            m.role === 'system' ? 'system' : 'user',
+      content: m.content || m.text || ''
+    })).filter(m => m.content.trim().length > 0);
+
+    if (cleanMessages.length === 0) {
+      throw new Error('Нет сообщений для отправки');
     }
-    
-    const text = await response.text();
-    
-    if (!text || text.trim().length === 0) {
+
+    console.log('Pollinations request:', { model, messagesCount: cleanMessages.length });
+
+    // ИСПРАВЛЕНИЕ: Используем POST с JSON телом вместо GET с URL-параметрами
+    const response = await fetch(BASE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/plain'
+      },
+      body: JSON.stringify({
+        messages: cleanMessages,
+        model: model,
+        seed: Date.now(),
+        temperature: 0.7,
+        max_tokens: 2048
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Pollinations HTTP error:', response.status, errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+    }
+
+    // Pollinations может вернуть JSON или plain text
+    const contentType = response.headers.get('content-type') || '';
+    let result;
+
+    if (contentType.includes('application/json')) {
+      const jsonData = await response.json();
+      // Поддержка разных форматов ответа
+      result = jsonData.choices?.[0]?.message?.content || 
+               jsonData.response || 
+               jsonData.text || 
+               jsonData.content ||
+               JSON.stringify(jsonData);
+    } else {
+      result = await response.text();
+    }
+
+    if (!result || result.trim().length === 0) {
       throw new Error('Пустой ответ от API');
     }
-    
-    // Очищаем ответ от возможного мусора
-    const cleanText = text.trim();
-    
+
     return {
       success: true,
-      content: cleanText,
+      content: result.trim(),
       model: model,
       provider: 'Pollinations'
     };
-    
+
   } catch (error) {
     console.error('Pollinations API error:', error.message);
     
@@ -68,11 +90,19 @@ export async function askPollinations(messages, model = 'openai') {
 
 // Простая генерация без истории
 export async function generateText(prompt, model = 'openai') {
+  if (!prompt || prompt.trim().length === 0) {
+    return {
+      success: false,
+      error: 'Пустой промпт',
+      model: model
+    };
+  }
+  
   const messages = [{ role: 'user', content: prompt }];
   return askPollinations(messages, model);
 }
 
-// Генерация изображения
+// Генерация изображения (GET — здесь нормально, т.к. промпт короткий)
 export async function generateImage(prompt, options = {}) {
   const {
     width = 1024,
@@ -84,8 +114,12 @@ export async function generateImage(prompt, options = {}) {
   } = options;
   
   try {
+    if (!prompt || prompt.trim().length === 0) {
+      throw new Error('Пустой промпт для изображения');
+    }
+
     // Формируем URL для изображения
-    let url = `${IMAGE_URL}/prompt/${encodeURIComponent(prompt)}`;
+    let url = `${IMAGE_URL}/prompt/${encodeURIComponent(prompt.trim())}`;
     url += `?width=${width}&height=${height}&seed=${seed}&nologo=${nologo}`;
     
     if (negative) {
@@ -96,13 +130,19 @@ export async function generateImage(prompt, options = {}) {
       url += '&enhance=true';
     }
     
-    // Проверяем доступность
+    // Проверяем доступность с таймаутом
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    
     const checkResponse = await fetch(url, { 
       method: 'HEAD',
+      signal: controller.signal,
       headers: {
         'User-Agent': 'CerberAI-Bot/2.0'
       }
     });
+    
+    clearTimeout(timeout);
     
     if (!checkResponse.ok) {
       throw new Error(`Image service unavailable: HTTP ${checkResponse.status}`);
@@ -184,6 +224,28 @@ export function getAvailableModels() {
   ];
 }
 
+// Утилита для быстрой генерации с fallback
+export async function askPollinationsWithFallback(messages, preferredModel = 'openai') {
+  const models = ['openai', 'mistral', 'llama', 'claude', 'deepseek'];
+  
+  // Пробуем предпочтительную модель первой
+  const order = [preferredModel, ...models.filter(m => m !== preferredModel)];
+  
+  for (const model of order) {
+    const result = await askPollinations(messages, model);
+    if (result.success) {
+      return { ...result, usedFallback: model !== preferredModel, requestedModel: preferredModel };
+    }
+    console.log(`Model ${model} failed, trying next...`);
+  }
+  
+  return {
+    success: false,
+    error: 'Все модели недоступны',
+    model: preferredModel
+  };
+}
+
 // Экспорт по умолчанию
 export default {
   askPollinations,
@@ -191,5 +253,6 @@ export default {
   generateImage,
   checkHealth,
   getAvailableModels,
+  askPollinationsWithFallback,
   POLLINATIONS_MODELS
 };
