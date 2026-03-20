@@ -13,12 +13,7 @@ import { handlePreCheckout, handleSuccessfulPayment } from './handlers/payment.j
 
 dotenv.config();
 
-const apiKey = process.env.OPENROUTER_API_KEY;
-
-if (!apiKey) {
-  console.error('❌ OPENROUTER_API_KEY не найден в переменных окружения');
-  process.exit(1);
-}
+// УБРАЛИ проверку OPENROUTER_API_KEY — используем бесплатный Pollinations
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("❌ TELEGRAM_BOT_TOKEN не найден в .env");
@@ -30,11 +25,12 @@ const adminState = new Map();
 
 await bot.api.setMyCommands([
   { command: "start", description: "🚀 Запустить бота" },
-  { command: "about", description: "🤖 О боте и нейросетях" },
+  { command: "about", description: "� О боте и нейросетях" },
   { command: "balance", description: "💰 Баланс токенов" },
   { command: "profile", description: "👤 Мой профиль" },
   { command: "rules", description: "📋 Правила" },
   { command: "help", description: "❓ Помощь" },
+  { command: "models", description: "🧠 Выбрать модель AI" },
 ]);
 
 bot.command("start", handleStart);
