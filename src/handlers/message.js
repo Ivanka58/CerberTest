@@ -104,8 +104,8 @@ export async function handleUserMessage(ctx) {
         responseText = `🎨 *${route.modelName}*\n\nОшибка генерации: ${err.message}`;
       }
     } else {
-      const systemPrompt = getSystemPromptForType(route.requestType, dbUser.isVip);
-      responseText = await generateTextResponse(userMessage, historyForAI, systemPrompt, route.geminiModel);
+      const systemPrompt = getSystemPromptForType(route.requestType, dbUser.isVip, route.provider);
+      responseText = await generateTextResponse(userMessage, historyForAI, systemPrompt, route);
     }
 
     if (!dbUser.isVip) {
@@ -163,4 +163,4 @@ function splitIntoChunks(text, maxLen) {
   }
   if (remaining) chunks.push(remaining);
   return chunks;
-  }
+                             }
