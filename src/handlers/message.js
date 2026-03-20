@@ -1,5 +1,6 @@
 import { getOrCreateUser, deductTokens, saveChatMessage, getChatHistory } from '../db/queries.js';
-import { routeRequest, getSystemPromptForType, generateTextResponse, generateImageResponse } from '../ai/router.js';
+import { routeRequest, getSystemPromptForType, generateTextResponse } from '../ai/router.js';
+import { generateImage } from '../ai/providers/pollinations.js';
 
 const CREATOR_QUERIES = [
   "кто тебя создал", "кто твой создатель", "кто владелец", "кто хозяин",
@@ -48,10 +49,18 @@ export async function handleUserMessage(ctx) {
   try {
     const route = await routeRequest(userMessage);
 
+    // Проверка платной модели
+    if (route.paid && route.unavailable) {
+      await ctx.api.deleteMessage(ctx.chat.id, typingMsg.message_id).catch(() => {});
+      await ctx.reply(route.note || `💎 ${route.modelName} — платная модель. Используйте бесплатные через /models`, { parse_mode: "Markdown" });
+      return;
+    }
+
+    // Проверка токенов
     if (!dbUser.isVip && dbUser.tokens < route.tokensRequired) {
       await ctx.api.deleteMessage(ctx.chat.id, typingMsg.message_id).catch(() => {});
       await ctx.reply(
-        `❌ *Недостаточно токенов для этого запроса!*\n\n` +
+        `❌ *Недостаточно токенов!*\n\n` +
         `Нужно: *${route.tokensRequired}* токенов\n` +
         `У вас: *${dbUser.tokens}* токенов\n\n` +
         `Пополни баланс: /balance`,
@@ -60,6 +69,7 @@ export async function handleUserMessage(ctx) {
       return;
     }
 
+    // Обновление статуса
     await ctx.api.editMessageText(
       ctx.chat.id,
       typingMsg.message_id,
@@ -73,41 +83,49 @@ export async function handleUserMessage(ctx) {
     await saveChatMessage(telegramUser.id, "user", userMessage, 0);
 
     let responseText = "";
+    let imageUrl = null;
 
-    if (route.requestType === "image") {
-      try {
-        await ctx.api.editMessageText(
-          ctx.chat.id, typingMsg.message_id,
-          `🎨 _Генерирую изображение с помощью ${route.modelName}..._`,
-          { parse_mode: "Markdown" }
-        ).catch(() => {});
+    // Генерация изображения
+    if (route.requestType === "image" && route.api === 'pollinations-image') {
+      await ctx.api.editMessageText(
+        ctx.chat.id, 
+        typingMsg.message_id,
+        `🎨 _Генерирую изображение..._`,
+        { parse_mode: "Markdown" }
+      ).catch(() => {});
 
-        await new Promise(r => setTimeout(r, 2000));
-        
-        await ctx.api.deleteMessage(ctx.chat.id, typingMsg.message_id).catch(() => {});
-        
-        if (!dbUser.isVip) {
-          await deductTokens(telegramUser.id, route.tokensRequired);
-        }
+      const imageResult = await generateImage(userMessage, {
+        width: 1024,
+        height: 1024,
+        enhance: true
+      });
 
+      await ctx.api.deleteMessage(ctx.chat.id, typingMsg.message_id).catch(() => {});
+
+      if (!dbUser.isVip) {
+        await deductTokens(telegramUser.id, route.tokensRequired);
+      }
+
+      if (imageResult.success) {
+        await ctx.replyWithPhoto(imageResult.url, {
+          caption: `🎨 *${route.modelName}*\n\n_${userMessage}_\n\n💰 Потрачено: ${route.tokensRequired} токенов`,
+          parse_mode: "Markdown"
+        });
+        await saveChatMessage(telegramUser.id, "assistant", `[Изображение: ${userMessage}]`, route.tokensRequired);
+      } else {
         await ctx.reply(
-          `🎨 *${route.modelName}*\n\n` +
-          `_Сгенерировано по запросу: "${userMessage}"_\n\n` +
-          `💰 Потрачено: ${route.tokensRequired} токенов\n\n` +
-          `⚠️ *В демо-режиме изображения не генерируются. Подключите API для реальной генерации.*`,
+          `🎨 *${route.modelName}*\n\n❌ Ошибка генерации: ${imageResult.error}\n\nПопробуйте другой запрос.`,
           { parse_mode: "Markdown" }
         );
-
-        await saveChatMessage(telegramUser.id, "assistant", `[Изображение сгенерировано]`, route.tokensRequired);
-        return;
-      } catch (err) {
-        responseText = `🎨 *${route.modelName}*\n\nОшибка генерации: ${err.message}`;
       }
-    } else {
-      const systemPrompt = getSystemPromptForType(route.requestType, dbUser.isVip, route.provider);
-      responseText = await generateTextResponse(userMessage, historyForAI, systemPrompt, route);
+      return;
     }
 
+    // Текстовая генерация
+    const systemPrompt = getSystemPromptForType(route.requestType, dbUser.isVip, route.provider);
+    responseText = await generateTextResponse(userMessage, historyForAI, systemPrompt, route);
+
+    // Списание токенов
     if (!dbUser.isVip) {
       const deducted = await deductTokens(telegramUser.id, route.tokensRequired);
       if (!deducted) {
@@ -121,16 +139,19 @@ export async function handleUserMessage(ctx) {
 
     await ctx.api.deleteMessage(ctx.chat.id, typingMsg.message_id).catch(() => {});
 
+    // Форматирование ответа
     const tierEmoji = { basic: "🟢", standard: "🔵", pro: "🟣", ultra: "⭐" };
     const typeEmoji = {
-      text: "💬", code: "💻", image: "🎨", video: "🎬", short: "⚡", detailed: "📊", emotional: "💙"
+      text: "💬", code: "💻", image: "🎨", video: "🎬", 
+      detailed: "📊", emotional: "💙"
     };
 
-    const header = `${tierEmoji[route.complexity] || "🔵"} ${typeEmoji[route.requestType] || "💬"} *${route.modelName}*\n\n`;
-    const footer = `\n\n━━━━━━━━━━\n💰 Потрачено: ${route.tokensRequired} токенов`;
+    const header = `${tierEmoji[route.complexity] || "🔵"} ${typeEmoji[route.requestType] || "💬"} *${route.modelName}* ${route.free ? '✅' : '💎'}\n\n`;
+    const footer = `\n\n━━━━━━━━━━\n💰 Потрачено: ${route.tokensRequired} токенов${route.free ? ' (бесплатно)' : ''}`;
 
     const fullText = header + responseText + footer;
 
+    // Отправка длинных сообщений частями
     if (fullText.length > 4000) {
       const chunks = splitIntoChunks(responseText, 3500);
       for (let i = 0; i < chunks.length; i++) {
@@ -163,4 +184,4 @@ function splitIntoChunks(text, maxLen) {
   }
   if (remaining) chunks.push(remaining);
   return chunks;
-                             }
+}
