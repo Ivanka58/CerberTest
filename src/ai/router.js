@@ -1,4 +1,4 @@
-import { askPollinations } from './providers/pollinations.js';
+import { askPollinationsWithFallback } from './providers/pollinations.js';
 
 // ==================== КАТАЛОГ ВСЕХ 130+ МОДЕЛЕЙ ====================
 
@@ -763,113 +763,32 @@ export async function generateTextResponse(userMessage, history, systemPrompt, r
   }
   
   // Генерация через Pollinations (ИСПРАВЛЕНО: используем POST вместо GET)
-  if (route.api === 'pollinations') {
-    // Формируем messages в формате OpenAI-compatible
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...history.slice(-10).map(msg => ({
-        role: msg.role === 'assistant' ? 'assistant' : 'user',
-        content: msg.content || msg.text || ''
-      })),
-      { role: 'user', content: userMessage }
-    ];
-    
-    // Очищаем сообщения от пустых значений
-    const cleanMessages = messages.filter(m => m.content && m.content.trim().length > 0);
-    
-    try {
-      console.log('=== POLLINATIONS REQUEST ===');
-      console.log('Model:', route.pollinationsModel);
-      console.log('Messages count:', cleanMessages.length);
-      
-      // ИСПРАВЛЕНИЕ: Используем POST с JSON телом вместо GET с URL-параметрами
-      const response = await fetch('https://text.pollinations.ai/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          messages: cleanMessages,
-          model: route.pollinationsModel, // 'openai', 'mistral', 'llama', 'claude', 'deepseek'
-          seed: Date.now(),
-          temperature: 0.7,
-          max_tokens: 2048
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Pollinations HTTP error:', response.status, errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText || 'Unknown error'}`);
-      }
-      
-      // Pollinations может вернуть plain text или JSON
-      const contentType = response.headers.get('content-type') || '';
-      let result;
-      
-      if (contentType.includes('application/json')) {
-        const jsonData = await response.json();
-        result = jsonData.choices?.[0]?.message?.content || jsonData.response || jsonData.text || JSON.stringify(jsonData);
-      } else {
-        result = await response.text();
-      }
-      
-      if (!result || result.trim().length === 0) {
-        throw new Error('Пустой ответ от API');
-      }
-      
-      return result;
-      
-    } catch (error) {
-      console.error('Pollinations error:', error);
-      
-      // Fallback на другие модели
-      const fallbackModels = ['openai', 'mistral', 'llama', 'claude'];
-      for (const fallback of fallbackModels) {
-        if (fallback === route.pollinationsModel) continue;
-        
-        try {
-          console.log(`Trying fallback model: ${fallback}`);
-          
-          const fallbackResponse = await fetch('https://text.pollinations.ai/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-              messages: cleanMessages,
-              model: fallback,
-              seed: Date.now(),
-              temperature: 0.7
-            })
-          });
-          
-          if (fallbackResponse.ok) {
-            const contentType = fallbackResponse.headers.get('content-type') || '';
-            let fallbackResult;
-            
-            if (contentType.includes('application/json')) {
-              const jsonData = await fallbackResponse.json();
-              fallbackResult = jsonData.choices?.[0]?.message?.content || jsonData.response || jsonData.text;
-            } else {
-              fallbackResult = await fallbackResponse.text();
-            }
-            
-            if (fallbackResult && fallbackResult.trim().length > 0) {
-              return fallbackResult + '\n\n_(⚠️ Ответ от резервной модели ' + fallback + ')_';
-            }
-          }
-        } catch (e) {
-          console.error(`Fallback ${fallback} failed:`, e.message);
-          continue;
-        }
-      }
-      
-      return `⚠️ Ошибка генерации: ${error.message}\n\nПопробуйте:\n1. Уменьшить длину сообщения\n2. Выбрать другую модель через /models\n3. Повторить запрос позже\n\n📞 Поддержка: @Ivanka58`;
+// В router.js замените вызов на:
+import { askPollinationsWithFallback } from './providers/pollinations.js';
+
+// В generateTextResponse:
+if (route.api === 'pollinations') {
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...history.slice(-5).map(msg => ({  // уменьшил до 5 для надёжности
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: msg.content || msg.text || ''
+    })),
+    { role: 'user', content: userMessage }
+  ].filter(m => m.content.trim().length > 0);
+
+  const result = await askPollinationsWithFallback(messages, route.pollinationsModel);
+  
+  if (result.success) {
+    let response = result.content;
+    if (result.usedFallback) {
+      response += `\n\n_(⚠️ Использована резервная модель ${result.model})_`;
     }
+    return response;
   }
+  
+  return `⚠️ ${result.error}\n\nПопробуйте позже или выберите другую модель /models`;
+}
   
   // Неизвестный API
   return `⚠️ Неизвестный тип API: ${route.api}\n\nИспользуйте бесплатные модели Pollinations через /models`;
